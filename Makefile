@@ -12,5 +12,5 @@ clean :
 	@rm -f *.o core *~
 
 Filtro : Filtro.cu Funciones.cu
-	$(COMPIL) -o Filtro Filtro.cu Funciones.cu Funciones_Alumno.cu $(CFLAGS) $(LIBS)
+	$(COMPIL) -o EXE/Filtro Filtro.cu Funciones.cu Funciones_Alumno.cu $(CFLAGS) $(LIBS)
 
