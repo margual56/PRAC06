@@ -1,53 +1,54 @@
 #include "Prototipos_Alumno.h"
 
-__global__ void kernel_Filtro1(double *IMG1, double *IMG2, const unsigned int DimX, const unsigned int DimY, double *GAUSS){
+__global__ void kernel_Filtro1_vertical(double *IMG1, double *IMG2, const unsigned int DimX, const unsigned int DimY, double *GAUSS){
 	int half = 2;
 
-    //extern __shared__ double *IMG2[DimX*DimY];
+    //extern __shared__ double *IMG2[];
 
-    int i = blockIdx.y * blockDim.y + threadIdx.y + half;
     int j = blockIdx.x * blockDim.x + threadIdx.x + half;
+    int i = blockIdx.y * blockDim.y + threadIdx.y + half;
 
     //if( i < DimY && j<DimX)
     //    IMG2[i*DimX+j] = IMG1[i*DimX+j];
 
     //__syncthreads();
 
-	int f, iDx;
-	double sum;
+	// Filtro por columnas
+    if(i < DimY-half && j < DimX-half) {
+		IMG2[i*DimX+j] = 
+			IMG1[(i-2)*DimX + j] * 1.0/16.0 + 
+			IMG1[(i-1)*DimX + j] * 4.0/16.0 + 
+			IMG1[(i+0)*DimX + j] * 6.0/16.0 + 
+			IMG1[(i+1)*DimX + j] * 4.0/16.0 + 
+			IMG1[(i+2)*DimX + j] * 1.0/16.0; 
+    }
+}
+
+__global__ void kernel_Filtro1_horizontal(double *IMG1, double *IMG2, const unsigned int DimX, const unsigned int DimY, double *GAUintSS){
+	int half = 2;
+
+    //extern __shared__ double *IMG2[];
+
+    int j = blockIdx.x * blockDim.x + threadIdx.x + half;
+    int i = blockIdx.y * blockDim.y + threadIdx.y + half;
+
+    //if( i < DimY && j<DimX)
+    //    IMG2[i*DimX+j] = IMG1[i*DimX+j];
+
+    //__syncthreads();
+
+	int iDx;
 
 	// Filtro por columnas
-    if(i < DimY-half*2){
+    if(i < DimY-half && j < DimX-half) {
         iDx = i*DimX;
-	    //for (i = half; i<DimY-half; i++){
-	    	//iDx = i*DimX;
+		
+		IMG1[iDx+j] = 
+			IMG2[iDx + (j-2)] * 1.0/16.0 + 
+			IMG2[iDx + (j-1)] * 4.0/16.0 + 
+			IMG2[iDx + (j+0)] * 6.0/16.0 + 
+			IMG2[iDx + (j+1)] * 4.0/16.0 + 
+			IMG2[iDx + (j+2)] * 1.0/16.0;
 
-            if(j < DimX-half*2){
-	    	    //for (j = half; j<DimX-half; j++){
-	    	    	sum = 0.0;
-                    
-	    	    	for(f = 0; f<5; f++)
-	    	    		sum += IMG1[iDx+(f-half)*DimX + j]*GAUSS[f];
-                    
-	    	    	IMG2[iDx+j] = sum;
-	    	    //}
-	    //}
-
-                    __syncthreads();
-
-	    // Filtro por filas
-	    //for (i = half; i<DimY-half; i++){
-	    	//iDx = i*DimX;
-
-	    	    //for (j = half; j<DimX-half; j++){
-	    	    	sum = 0.0;
-                
-	    	    	for(f = 0; f<5; f++)
-	    	    		sum += IMG2[iDx + j + (f-half)]*GAUSS[f];
-                
-	    	    	IMG1[iDx+j] = sum;
-	    	    //}
-            }
-	    //}
-    }
+	}
 }

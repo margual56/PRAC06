@@ -50,6 +50,10 @@ int main(int argc, char* argv[])
       (DimX + (ThBlk-1)) / ThBlk,
       (DimY + (ThBlk-1)) / ThBlk
    );
+
+   printf("Dado que hay %d threads por bloque, se ha calculado que para esta imagen hacen falta bloques de %dx%d\n",
+   ThBlk, blks.x, blks.y);
+
    dim3 thrs (
       ThBlk,
       ThBlk
@@ -65,15 +69,20 @@ int main(int argc, char* argv[])
      //CUDAERR(cudaMemcpy(backup, Device_Image, DimX*DimY, cudaMemcpyDeviceToDevice));
      CUDAERR(cudaMemcpy(copy, Device_Image, DimX*DimY*sizeof(double), cudaMemcpyDeviceToDevice));
      
+     printf("Aplicando filtro gaussiano %d veces\n", Repet);
      /* aqui empieza el suavizado */
      for (i=1; i<=Repet; i++)
      {
         /* llamada al (los) kernel para suavizar */
-        //TODO: Separar kernel en dos (pase vertical y horizontal)
-        kernel_Filtro1<<<blks, thrs>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
+        kernel_Filtro1_vertical<<<blks, thrs>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
+	     CHECKLASTERR();
+
+	     kernel_Filtro1_horizontal<<<blks, thrs>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
+	     CHECKLASTERR();
      }
 
      /* ahora el calculo del promedio */
+
 
      /* ahora la llamada al kernel para binarizar */
 
@@ -83,7 +92,7 @@ int main(int argc, char* argv[])
          
      /* lo que proceda para que el resultado este en el puntero Image */
 
-     CUDAERR(cudaMemcpy(Image, copy, DimX*DimY*sizeof(double), cudaMemcpyDeviceToHost)); 
+     CUDAERR(cudaMemcpy(Image, Device_Image, DimX*DimY*sizeof(double), cudaMemcpyDeviceToHost)); 
      
    cudaEventRecord(stop, 0);
    cudaEventSynchronize(stop);
