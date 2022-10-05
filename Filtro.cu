@@ -46,16 +46,24 @@ int main(int argc, char* argv[])
    CUDAERR(cudaMalloc((void **) &copy, DimX*DimY*sizeof(double)));
 
    // Ceil the result [ (n + (p-1))/p ]
-   dim3 blks (
+   dim3 blks2D (
       (DimX + (ThBlk-1)) / ThBlk,
       (DimY + (ThBlk-1)) / ThBlk
    );
 
-   printf("Dado que hay %d threads por bloque, se ha calculado que para esta imagen hacen falta bloques de %dx%d\n",
-   ThBlk, blks.x, blks.y);
+   dim3 blks1D (
+      (DimX * DimY + (ThBlk-1)) / ThBlk
+   );
 
-   dim3 thrs (
+   printf("Dado que hay %d threads por bloque, se ha calculado que para esta imagen hacen falta bloques de %dx%d\n",
+   ThBlk, blks2D.x, blks2D.y);
+
+   dim3 thrs2D (
       ThBlk,
+      ThBlk
+   );
+
+   dim3 thrs1D (
       ThBlk
    );
 
@@ -66,7 +74,7 @@ int main(int argc, char* argv[])
      // Copiar datos
      CUDAERR(cudaMemcpy(Device_GAUSS, Host_GAUSS, 5*sizeof(double), cudaMemcpyHostToDevice)); 
      CUDAERR(cudaMemcpy(Device_Image, Image, DimX*DimY*sizeof(double), cudaMemcpyHostToDevice));
-     //CUDAERR(cudaMemcpy(backup, Device_Image, DimX*DimY, cudaMemcpyDeviceToDevice));
+     CUDAERR(cudaMemcpy(backup, Device_Image, DimX*DimY*sizeof(double), cudaMemcpyDeviceToDevice));
      CUDAERR(cudaMemcpy(copy, Device_Image, DimX*DimY*sizeof(double), cudaMemcpyDeviceToDevice));
      
      printf("Aplicando filtro gaussiano %d veces\n", Repet);
@@ -74,19 +82,32 @@ int main(int argc, char* argv[])
      for (i=1; i<=Repet; i++)
      {
         /* llamada al (los) kernel para suavizar */
-        kernel_Filtro1_vertical<<<blks, thrs>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
+        kernel_Filtro1_vertical<<<blks2D, thrs2D>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
 	     CHECKLASTERR();
 
-	     kernel_Filtro1_horizontal<<<blks, thrs>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
+	     kernel_Filtro1_horizontal<<<blks2D, thrs2D>>>(Device_Image, copy, DimX, DimY, Device_GAUSS);
 	     CHECKLASTERR();
      }
 
      /* ahora el calculo del promedio */
+     // TODO: Custom reduction kernel
+     // kernel_Filtro2<<<blks1D, thrs1D>>>(double *IMG, const unsigned int DimX, const unsigned int DimY, const double value);
 
+     double avg = 0;
+     cublasHandle_t handle;
+     CUBLASERR(cublasCreate(&handle));
+     CUBLASERR(cublasDasum(handle, DimX*DimY, Device_Image, 1, &avg));
+     CUBLASERR(cublasDestroy(handle));
+     avg /= DimX*DimY;
+
+     printf("El valor medio de la imagen es %.4f\n", avg);
 
      /* ahora la llamada al kernel para binarizar */
+     kernel_Filtro3<<<blks2D, thrs2D>>>(Device_Image, DimX, DimY, avg);
+     CHECKLASTERR();
 
      /* ahora la llamada al kernel para perfilar */
+     kernel_Filtro4<<<blks2D, thrs2D>>>(Device_Image, backup, DimX, DimY, avg);
 
      CHECKLASTERR();
          
@@ -112,7 +133,7 @@ int main(int argc, char* argv[])
    cudaFree(Device_GAUSS);
    cudaFree(Device_Image);
    cudaFree(copy);
-   //cudaFree(backup);
+   cudaFree(backup);
 
    return 0;
 }
